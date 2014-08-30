@@ -6,8 +6,8 @@
 #include <linux/uaccess.h>
 #include <linux/security.h>
 
+#ifdef CONFIG_SECURITY_FARHAN
 static struct proc_dir_entry *proc_entry;
-unsigned long (*my_register_security) (struct security_operations *ops)=(unsigned long *)0xffffffff81b77719;
 
 ssize_t my_read_proc(struct file *filp,char *buf,size_t count,loff_t *off){
        
@@ -55,7 +55,7 @@ static int __init init_mod(void){
 	else{
 		printk("Module loaded successfully\n");
 	}
-	ret=my_register_security(&rbac_ops);
+	ret=register_security(&rbac_ops);
 	if(ret){
 		printk("Cannot register the security\n");
 	}
@@ -73,3 +73,4 @@ static void __exit exit_mod(void){
 module_init(init_mod);
 module_exit(exit_mod);
 MODULE_LICENSE("GPL");
+#endif
