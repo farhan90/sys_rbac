@@ -1,0 +1,7 @@
+config SECURITY_FARHAN
+	bool "FARHAN Security Support"
+	depends on SECURITY
+	select NETWORK_SECMARK
+	default n
+	help
+	 This selects FARHAN security module
