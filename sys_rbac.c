@@ -5,37 +5,44 @@
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
 #include <linux/security.h>
+#include <linux/sched.h>
+#include <linux/cred.h>
+#include <linux/uidgid.h>
+#include <linux/fsnotify.h>
 
 #ifdef CONFIG_SECURITY_FARHAN
 static struct proc_dir_entry *proc_entry;
 static unsigned long buff_size=0;
-static int proc_max_size=100;
 char proc_msg[100];
+
 
 struct policy{
 	uid_t uid;
 	int role;
 };
 
-
+struct policy policy_list[10];
+int index;
 
 ssize_t my_read_proc(struct file *filp,char *buf,size_t count,loff_t *off){
 	memcpy(buf,proc_msg,buff_size);
 	//printk("In the read function %d\n",ret);
 	return buff_size;
 }
+
 ssize_t my_write_proc(struct file *file,char *buf,size_t count,loff_t *ppos){
 	
-	struct policy *pol=kmalloc(sizeof(struct policy),GFP_KERNEL);
+	//struct policy *pol=kmalloc(sizeof(struct policy),GFP_KERNEL);
+	struct policy pol;
 	int size=sizeof(struct policy);
 	if(count>size){
 		count=size;
 	}
-	if(copy_from_user(pol,buf,size)){
+	if(copy_from_user(&pol,buf,size)){
 		return -EFAULT;
 	}
-	printk("In the write function %d\n",pol->uid);
-	kfree(pol);
+	printk("In the write function %d\n",pol.uid);
+	//kfree(pol);
 	return size;
 }
 
@@ -44,12 +51,38 @@ struct file_operations proc_fops={
 	.write=my_write_proc,
 };
 
-static int my_file_perm(struct file *file,int mask){
-	//printk(KERN_INFO "In my perm module \n");
+static int my_inode_perm(struct inode *inode,int mask){
+	
+	if(current->cred->uid.val==500 && (mask & MAY_WRITE)){
+		return -EPERM;
+	}
+	return 0;
+}
+
+
+
+static int my_inode_create(struct inode *inode,struct dentry *dentry,umode_t mode){
+	if(current->cred->uid.val==500){
+		return 0;
+	}
+	return 0;
+}
+
+static int my_inode_unlink(struct inode *dir,struct dentry *dentry){
+	if(current->cred->uid.val==500){
+		return -EPERM;
+	}
+	return 0;
+}
+
+static int my_file_perm(struct file *file, int mask){
 	return 0;
 }
 
 struct security_operations rbac_ops={
+	.inode_permission=my_inode_perm,
+	.inode_create=my_inode_create,
+	.inode_unlink=my_inode_unlink,
 	.file_permission=my_file_perm,
 };
 
