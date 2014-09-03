@@ -1,0 +1,23 @@
+This is the documentation for SBRACK project
+
+DESIGN
+------
+Since the project was an open ended project with no specification,I decided
+to implement a very simple role based access model using Linux Security Model
+framework. 
+
+In my role based access model I first had to idenitfy the tasks which could
+be performed on the file system. I decided to have simple tasks or operations
+like reading,writing,renaming or creating or deleting a file. So i decided to 
+have 3 main ops which are READ, RDWR, CRTDEL. 
+
+The READ task or op only allows a user to read a file
+The RDWR task allows someone to read a file, write to a file
+The CRTDEL tasks allows someone to read,write, create,delete or rename a file
+
+So any role can be assigned any of these 3 tasks, which can be performed by
+the users of that role.
+
+
+
+
