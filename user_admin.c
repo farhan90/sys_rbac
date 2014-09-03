@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -9,7 +9,7 @@
 #include <pwd.h>
 
 #define MAX_CHAR_SIZE 20
-#define MAX_ROLE 20
+#define MAX_ROLE 100
 #define READ 1
 #define RDWR 2
 #define CRTDEL 3
@@ -66,29 +66,39 @@ out:
 	return ret;
 }
 
-void assign_role(){
-	char name[MAX_CHAR_SIZE];
-	int role;
-	printf("Enter user name:");
-	scanf("%s",&name);
-	printf("Enter role:");
-	scanf("%d",&role);
-	write_policy(name,role);
+void assign_role(char *user,char *role_name){
+	int i=0;
+	int role=-1;
+	for(i=0;i<idx;i++){
+		if(strncmp(role_list[i].name,role_name,MAX_CHAR_SIZE)==0){	
+		 	role=role_list[i].role;
+		}
+
+	}
+	if(role==-1){
+		printf("The role %s does not exists\n",role_name);
+		return;
+	}
+	write_policy(user,role);
 
 }
-int write_role(struct role_map *role_map){
+int write_role(){
 	int ret=0;
+	int i=0;
 	char *new_line="\n";	
-	FILE *ptr=fopen("role.mp","a+");
+	FILE *ptr=fopen("role.mp","w");
 	if(!ptr){
 		printf("Could not open the file role.mp to save the role\n");
 		printf("The errno is %d\n",errno);
 		return -1;
 	}
-	ret=fwrite(role_map,sizeof(struct role_map),1,ptr);
-	ret=fwrite(new_line,strlen(new_line),1,ptr);
-	if(ret<0){
-		printf("Error in writing to file role.mp %d\n",errno);
+	for(i=0;i<idx;i++){
+		struct role_map role_map=role_list[i];
+		ret=fwrite(&role_map,sizeof(struct role_map),1,ptr);
+		ret=fwrite(new_line,strlen(new_line),1,ptr);
+		if(ret<0){
+			printf("Error in writing to file role.mp %d\n",errno);
+		}
 	}
 	
 	fclose(ptr);
@@ -111,7 +121,6 @@ void print_role_map(struct role_map *role_map){
 	
 }
 void print_role_list(){
-	read_role();
 	int i=0;
 	for(i=0;i<idx;i++){
 		print_role_map(&role_list[i]);
@@ -126,9 +135,13 @@ int read_role(){
 	FILE *ptr=fopen("role.mp","r");
 	
 	if(!ptr){
-		printf("Could not open the file role.mp to save the role\n");
-		printf("The errno is %d\n",errno);
-		return -1;
+		if(errno==2){
+			return 0;
+		}
+		else{
+			printf("Could not open the file role.mp to read the role\n");
+			return -1;
+		}
 	}
 	while((ret=getline(&line,&len,ptr))!=-1){
 		//printf("Retrived line of length %zu :\n",ret);
@@ -145,10 +158,14 @@ int read_role(){
 
 }
 
+
+
 void create_role(){
 	char role_name[MAX_CHAR_SIZE];
 	int role;
 	struct role_map role_map;
+	int i=0;
+	int bool=0;
 	printf("Enter the role name:");
 	scanf("%s",&role_name);
 	printf("Please select one of the tasks to be assigned to the role\n");
@@ -161,41 +178,69 @@ void create_role(){
 	role_map.role=role;
 	printf("You created the role %s with task %d\n\n",role_map.name,
 			role_map.role);
-	write_role(&role_map);
+	
+	for(i=0;i<idx;i++){
+		if(strncmp(role_list[i].name,role_map.name,MAX_CHAR_SIZE)==0){
+			printf("The role already exists, will over write\n");
+			role_list[i]=role_map;
+			bool=1; 
+		}
+		
+	}
+	
+	//Could not find role in the list
+	if(bool==0){
+		role_list[idx]=role_map;
+		idx++;
+	}
+	
 		
 }
 
-void process_opt(int opt){
-	
-	if(opt==4){
-		printf("Goodbye!\n");
-		exit(0);
-	}
-	if(opt==1){
-		assign_role();
-	}
-	if(opt==2){
-		create_role();
-	}
-	if(opt==3){
-		print_role_list();
-	}
+void print_help(){
+	printf("Welcome to user admin\n");
+	printf("-h : print help\n");
+	printf("-l : list of existing roles\n");
+	printf("-a : -a [username] [role name]\n");
+	printf("-c : create a role\n");
+
 }
 
-int main(){	
-	printf("Welcome to user admin\n");
-	while(1){
-		int opt=0;
-		printf("Please select: \n");
-		printf("1)Assign Role\n");
-		printf("2)Create Role\n");
-		printf("3)List all created roles\n");
-		printf("4)Quit\n");
-		printf("Enter:");
-		scanf("%d",&opt);
-		process_opt(opt);
+int main(int argc,char *argv[]){	
+	int opt;
+	int i=0;
+	int flag=0;
+	read_role();
+	while((opt=getopt(argc,argv,"hlca:"))!=-1){
+		switch(opt){
+			case 'h':
+				print_help();
+				flag=1;
+				break;
 
-	}	
+			case 'l':
+				print_role_list();
+				flag=1;
+				break;
+
+			case 'c':
+				create_role();
+				flag=1;
+				break;
+			case 'a':
+				assign_role(optarg,argv[optind]);
+				flag=1;
+				break;
+				
+		}
+	}
+	write_role();	
+
+	if(flag==0){
+		print_help();
+		exit(1);
+	}
+		
 }
 
 
