@@ -27,6 +27,8 @@ struct role_map{
 struct role_map role_list[MAX_ROLE];
 int idx=0;
 
+
+
 int write_policy(char *name,int role){
 	struct passwd *res;
 	struct policy pol;
@@ -92,6 +94,7 @@ int write_role(struct role_map *role_map){
 	fclose(ptr);
 	return ret;
 }
+
 
 void print_role_map(struct role_map *role_map){
 	char *role;	

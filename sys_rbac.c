@@ -9,10 +9,12 @@
 #include <linux/cred.h>
 #include <linux/uidgid.h>
 #include <linux/fsnotify.h>
+#include <linux/fs_struct.h>
 
 #define MY_READ 1
 #define MY_RDWR 2
 #define MY_CRTDEL 3
+
  
 #ifdef CONFIG_SECURITY_FARHAN
 static struct proc_dir_entry *proc_entry;
@@ -25,25 +27,23 @@ struct policy{
 	int role;
 };
 
-
 struct policy_node{
 	struct policy *data;
 	struct policy_node *next;  
 };
 
-struct policy policy_list[10];
 struct policy_node *root;
 
 
 struct policy_node *create_node(struct policy *pol){
 	struct policy_node *node=kmalloc(sizeof(struct policy_node),GFP_KERNEL);
 	if(node==NULL){
-		printk("Cannot create a node\n");
+		printk("Farhan : Cannot create a node\n");
 		return NULL;
 	}
 	node->data=kmalloc(sizeof(struct policy),GFP_KERNEL);
 	if(node->data==NULL){
-		printk("Cannot allocate memory for data of the node\n");
+		printk("Farhan: Cannot allocate memory for data of the node\n");
 		return NULL;
 	}
 	memcpy(node->data,pol,sizeof(struct policy));
@@ -81,21 +81,72 @@ void free_list(struct policy_node **root){
 void print_list(struct policy_node **root){
 	struct policy_node *ptr=*root;
 	while(ptr){
-		printk("The user id is %d and the role is %d\n",ptr->data->uid,ptr->data->role);
+		printk("Farhan: The user id is %d and the role is %d\n",ptr->data->uid,ptr->data->role);
 		ptr=ptr->next;
 	}
+}
+
+int init_read_policy_file(struct policy_node **root){
+	struct file *filp;
+	mm_segment_t oldfs;
+	int bytes;
+	char *buff=kmalloc(sizeof(struct policy),GFP_KERNEL);
+	int len=sizeof(struct policy);
+	struct policy_node *ptr;
+	filp=filp_open("home/policy.mp",O_RDWR,0);
+
+	if(!filp || IS_ERR(filp)){
+		printk("Farhan: Could not open the file because it might not exits\n");
+		printk("Farhan: The errno is %d\n",PTR_ERR(filp));
+		return 0;
+	}
+	filp->f_pos=0;
+	oldfs=get_fs();
+	set_fs(KERNEL_DS);
+	while((bytes=filp->f_op->read(filp,buff,len,&filp->f_pos))>0){
+		ptr=create_node((struct policy*)buff);
+		insert_node(root,ptr);
+	}
+	set_fs(oldfs);
+	kfree(buff);
+	filp_close(filp,NULL);
+
+	return bytes;
+}
+
+int write_policy_file(struct policy *pol){
+	struct file *file;
+	mm_segment_t oldfs;
+	int bytes;
+
+	file=filp_open("/home/policy.mp",O_APPEND|O_CREAT,0);
+
+	if(!file || IS_ERR(file)){
+		printk("Farhan: Could not open the file to write policy\n");
+		return -1;
+	}
+
+	file->f_pos=0;
+	oldfs=get_fs();
+	set_fs(KERNEL_DS);
+	bytes=file->f_op->write(file,(char *)pol,sizeof(struct policy),&file->f_pos);
+	set_fs(oldfs);
+	
+	filp_close(file,NULL);
+	return bytes;
+
 }
 
 void handle_data(struct policy *pol){
 	struct policy_node *ptr=find_node(&root,pol->uid);
 	if(ptr==NULL){
-		printk("The user does not exist in the list so will be inserted\n");
+		printk("Farhan: The user does not exist in the list so will be inserted\n");
 		
 		ptr=create_node(pol);
 		insert_node(&root,ptr);
 	}
 	else{
-		printk("The user already exists and will overwrite data\n");
+		printk("Farhan:The user already exists and will overwrite data\n");
 		memcpy(ptr->data,pol,sizeof(struct policy));
 	}
 
@@ -113,10 +164,6 @@ int user_perm(int uid){
 
 }
 
-struct policy policy_list[10];
-int index;
-
-
 ssize_t my_read_proc(struct file *filp,char *buf,size_t count,loff_t *off){
 	memcpy(buf,proc_msg,buff_size);
 	//printk("In the read function %d\n",ret);
@@ -124,7 +171,6 @@ ssize_t my_read_proc(struct file *filp,char *buf,size_t count,loff_t *off){
 }
 
 ssize_t my_write_proc(struct file *file,char *buf,size_t count,loff_t *ppos){
-	
 	struct policy pol;
 	int size=sizeof(struct policy);
 	if(count>size){
@@ -134,11 +180,9 @@ ssize_t my_write_proc(struct file *file,char *buf,size_t count,loff_t *ppos){
 		return -EFAULT;
 	}
 	printk("In the write function %d\n",pol.uid);
-
 	
 	handle_data(&pol);
 	print_list(&root);
-	
 	return size;
 }
 
@@ -149,7 +193,6 @@ struct file_operations proc_fops={
 
 static int my_inode_perm(struct inode *inode,int mask){
 	
-
 	int uid=current->cred->uid.val;
 	int perm=user_perm(uid);
 
@@ -170,24 +213,27 @@ static int my_inode_perm(struct inode *inode,int mask){
 
 
 static int my_inode_create(struct inode *inode,struct dentry *dentry,umode_t mode){
-
 	if(current->cred->uid.val==0){
 		return 0;
 	}
 	
-	if(current->cred->uid.val==500){
+	if(user_perm(current->cred->uid.val)!=MY_CRTDEL){
 		return -EPERM;
+	}
+	else
+		return 0;
 }
 
 static int my_inode_unlink(struct inode *dir,struct dentry *dentry){
 	if(current->cred->uid.val==0){
 		return 0;
 	}
-
-	if(current->cred->uid.val==500){
+	if(user_perm(current->cred->uid.val)!=MY_CRTDEL){
 		return -EPERM;
 	}
-	return 0;
+	else
+		return 0;
+
 }
 
 static int my_file_perm(struct file *file, int mask){
@@ -201,10 +247,17 @@ struct security_operations rbac_ops={
 	.file_permission=my_file_perm,
 };
 
+void my_get_path(void){
+	struct path pwd;
+	get_fs_pwd(current->fs,&pwd);
+	printk("Farhan: path is %s\n",pwd.dentry->d_name.name);
+
+}
 
 static int __init init_mod(void){
 	int ret=0;
 	root=NULL;
+
 	proc_entry=proc_create("my_test",0,NULL,&proc_fops);
 
 	if(proc_entry ==NULL){
