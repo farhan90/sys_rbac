@@ -45,6 +45,22 @@ The user_admin executable can be used with these options:
 
 
 
+WORKFLOW
+--------
+The workflow for the LSM works through the user program. Every time an admin 
+user assigns a role to a regular user, the data is passed to the LSM through
+the procfs. The LSM module maintains a linked list of all the users and their
+roles.
+
+So when a regular user tries to carry out a task he is not entitled too, he will receive an EPERM error.
+
+A problem with this worflow design is that every time the system reboots
+the kernel module looses all the user data. One solution would be for the module to write the data into a file and on initilization read from that file.
+But file reading and writing is advised against in the kernel and since the 
+module is built into the kernel reading a large file could slow the kernel down.
+
+My work around this would be that the admin user creates backup scripts to
+assign roles to users. 
 
 
 
