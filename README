@@ -18,6 +18,36 @@ The CRTDEL tasks allows someone to read,write, create,delete or rename a file
 So any role can be assigned any of these 3 tasks, which can be performed by
 the users of that role.
 
+BUILDING THE MODULE
+-------------------
+I did not implement my LSM module as a loadable module since I could not use
+the function register_module to register my security module. To get around the
+problem I had to built the module as a security module.
+To compile the module:
+
+1) mkdir sysec in the security folder of the linux source code folder.
+2) copy the sys_rbac.c, Kconfig, and Makefile into the sysec folder
+3) copy the file Kconfig.security and Makefile.security into Kconfig and 
+Makefile in the security directory
+4) replace the .config file in linux source code folder with Kernel.config 
+and rename the file .config
+5) Run make, make modules_install and make install
+
+USING THE USER PROGRAM
+----------------------
+The user program source code is in the user_admin.c file.
+
+The user_admin executable can be used with these options:
+	./user_admin -h  -- to print usage help
+	./user_admin -l  -- to list all the user created roles
+	./user_admin -c  -- to create a role
+	./user_admin -a [USER NAME] [ROLE NAME] -- to assign a role to a user
+
+
+
+
+
+
 
 
 
