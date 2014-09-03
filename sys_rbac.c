@@ -25,6 +25,7 @@ struct policy{
 	int role;
 };
 
+
 struct policy_node{
 	struct policy *data;
 	struct policy_node *next;  
@@ -112,6 +113,10 @@ int user_perm(int uid){
 
 }
 
+struct policy policy_list[10];
+int index;
+
+
 ssize_t my_read_proc(struct file *filp,char *buf,size_t count,loff_t *off){
 	memcpy(buf,proc_msg,buff_size);
 	//printk("In the read function %d\n",ret);
@@ -119,6 +124,7 @@ ssize_t my_read_proc(struct file *filp,char *buf,size_t count,loff_t *off){
 }
 
 ssize_t my_write_proc(struct file *file,char *buf,size_t count,loff_t *ppos){
+	
 	struct policy pol;
 	int size=sizeof(struct policy);
 	if(count>size){
@@ -128,9 +134,11 @@ ssize_t my_write_proc(struct file *file,char *buf,size_t count,loff_t *ppos){
 		return -EFAULT;
 	}
 	printk("In the write function %d\n",pol.uid);
+
 	
 	handle_data(&pol);
 	print_list(&root);
+	
 	return size;
 }
 
@@ -141,6 +149,7 @@ struct file_operations proc_fops={
 
 static int my_inode_perm(struct inode *inode,int mask){
 	
+
 	int uid=current->cred->uid.val;
 	int perm=user_perm(uid);
 
@@ -161,20 +170,20 @@ static int my_inode_perm(struct inode *inode,int mask){
 
 
 static int my_inode_create(struct inode *inode,struct dentry *dentry,umode_t mode){
+
 	if(current->cred->uid.val==0){
 		return 0;
 	}
 	
 	if(current->cred->uid.val==500){
 		return -EPERM;
-	}
-	return 0;
 }
 
 static int my_inode_unlink(struct inode *dir,struct dentry *dentry){
 	if(current->cred->uid.val==0){
 		return 0;
 	}
+
 	if(current->cred->uid.val==500){
 		return -EPERM;
 	}
